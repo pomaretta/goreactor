@@ -185,6 +185,9 @@ func (o *Cmd) Run(rl reactorlog.ReactorLog, msg lib.Msg) error {
 	if o.user != "" {
 		err := setUserToCmd(o.user, o.environment, c)
 		if err != nil {
+			o.r.SetLastExecutionError(
+				time.Now(),
+			)
 			return err
 		}
 	}
@@ -195,6 +198,9 @@ func (o *Cmd) Run(rl reactorlog.ReactorLog, msg lib.Msg) error {
 
 	if err := c.Start(); err != nil {
 		rl.Write([]byte("error starting process " + o.cmd + " " + strings.Join(args, " ") + ": " + err.Error()))
+		o.r.SetLastExecutionError(
+			time.Now(),
+		)
 		return err
 	}
 
@@ -203,8 +209,15 @@ func (o *Cmd) Run(rl reactorlog.ReactorLog, msg lib.Msg) error {
 
 	if err := c.Wait(); err != nil {
 		rl.Write([]byte("error running process: " + err.Error()))
+		o.r.SetLastExecutionError(
+			time.Now(),
+		)
 		return err
 	}
+
+	o.r.SetLastSuccessfullExecution(
+		time.Now(),
+	)
 
 	return nil
 }
