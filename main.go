@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/BurntSushi/toml"
+	"github.com/gabrielperezs/goreactor/http"
 	"github.com/gabrielperezs/goreactor/inputs"
 	"github.com/gabrielperezs/goreactor/logstreams"
 	"github.com/gabrielperezs/goreactor/outputs"
@@ -22,11 +23,13 @@ import (
 // by all the plugins and filled with the TOML parser
 type Config struct {
 	LogStream interface{}
+	HTTP      interface{}
 	Reactor   []interface{}
 }
 
 var (
 	running    []*reactor.Reactor
+	httpServer *http.HTTPServer
 	conf       Config
 	configFile string
 	configDir  string
@@ -61,6 +64,12 @@ func start() {
 		log.Printf("%s", err.Error())
 	}
 
+	// NOTE: Do not reload the HTTP if its configured.
+	httpServer, err = createServer(conf.HTTP)
+	if err != nil {
+		log.Printf("%s", err.Error())
+	}
+
 	for _, r := range conf.Reactor {
 		nr := reactor.NewReactor(r)
 		nr.SetLogStreams(lg)
@@ -80,6 +89,9 @@ func start() {
 		nr.Start()
 		running = append(running, nr)
 	}
+
+	// NOTE: Set new reactors for the HTTP server
+	httpServer.SetReactors(running)
 }
 
 func exit() {
@@ -126,6 +138,28 @@ func sing() {
 		default:
 		}
 	}
+}
+
+func createServer(cfg interface{}) (*http.HTTPServer, error) {
+	if httpServer != nil {
+		return httpServer, nil
+	}
+	newServer, err := http.New(conf.HTTP)
+	if err != nil {
+		log.Printf("%s", err.Error())
+		return nil, err
+	}
+
+	go func() {
+		err := newServer.Run()
+		if err != nil {
+			log.Printf("HTTP ERROR %s", err.Error())
+			return
+		}
+		log.Println("HTTP NEW Initialized")
+	}()
+
+	return newServer, nil
 }
 
 func readConfig(configFile, configDir string) (c *Config, err error) {
@@ -178,6 +212,12 @@ func readConfig(configFile, configDir string) (c *Config, err error) {
 		// Read first LogStream only
 		if c.LogStream == nil && configTemp.LogStream != nil {
 			c.LogStream = configTemp.LogStream
+		}
+
+		// TODO: Read first http configuration
+		if c.HTTP == nil && configTemp.HTTP != nil {
+			fmt.Printf("%#v\n", configTemp.HTTP)
+			c.HTTP = configTemp.HTTP
 		}
 	}
 	return c, nil

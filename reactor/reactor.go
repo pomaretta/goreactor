@@ -24,20 +24,22 @@ var (
 // Reactor is the struct where we keep the relation betwean Input plugins
 // and the Output plugins. Also contains the configuration for concurrency...
 type Reactor struct {
-	mu           sync.Mutex
-	I            lib.Input
-	O            lib.Output
-	Ch           chan lib.Msg
-	id           uint64
-	tid          uint64
-	Concurrent   int
-	Delay        time.Duration
-	Label        string
-	Hostname     string
-	listeners    int64
-	nextDeadline time.Time
-	done         chan bool
-	logStream    lib.LogStream
+	mu                       sync.Mutex
+	I                        lib.Input
+	O                        lib.Output
+	Ch                       chan lib.Msg
+	id                       uint64
+	tid                      uint64
+	Concurrent               int
+	Delay                    time.Duration
+	Label                    string
+	Hostname                 string
+	listeners                int64
+	nextDeadline             time.Time
+	done                     chan bool
+	logStream                lib.LogStream
+	lastSuccessfullExecution time.Time
+	lastExecutionError       time.Time
 }
 
 // NewReactor will create a reactor with the configuration
@@ -128,6 +130,30 @@ func (r *Reactor) Exit() {
 	if r.logStream != nil {
 		r.logStream.Exit()
 	}
+}
+
+func (r *Reactor) SetLastSuccessfullExecution(t time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.lastSuccessfullExecution = t
+}
+
+func (r *Reactor) SetLastExecutionError(t time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.lastExecutionError = t
+}
+
+func (r *Reactor) GetLastSuccessfullExecution() time.Time {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.lastSuccessfullExecution
+}
+
+func (r *Reactor) GetLastErrorExecution() time.Time {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.lastExecutionError
 }
 
 func (r *Reactor) listener() {
